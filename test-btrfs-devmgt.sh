@@ -941,12 +941,11 @@ test34  "#: raid1 seed, add sprout"
 test35  "#: add sprout, umount, mount seed, mount sprout"
 }
 
-#### Actual testing begins here #####
-clean
-		#When you change something related to device
-		#remember to test on btrfs boot separately
+#remember to test btrfs boot
 #test0  "#: btrfs boot test
 
+#### Actual testing begins here #####
+clean
 run_scan_mount_test
 run_replace_tests
 run_seed_sprout_tests
