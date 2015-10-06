@@ -75,11 +75,11 @@
 
 # Assign per your config, all 5 needed, replace might fail
 # if DEV5 < DEV4 < DEV3 < DEV2 < DEV1
-DEV1=/dev/sdd
-DEV2=/dev/sde
-DEV3=/dev/sdf
-DEV4=/dev/sdg
-DEV5=/dev/sdc
+DEV1=
+DEV2=
+DEV3=
+DEV4=
+DEV5=
 
 [[ -z $DEV1 ]] || [[ -z $DEV2 ]] || [[ -z $DEV3 ]] || [[ -z $DEV4 ]] || [[ -z $DEV5 ]] && echo "Need to initialize DEVx as above here" && exit
 
