@@ -10,87 +10,27 @@
 # you can check for the sysfs changes by running diff of TMP_FILE(s)
 
 
-		#When you change something related to device
-		#remember to test on btrfs boot separately
- #test0: btrfs boot test
-
-		#Replace:
- #test1: raid1, replace normal
- #test2: raid1, replace missing
- #test3: NOP
- #test4: raid1, replace missing, replace normal
- #test5: raid1, replace dev2, replace dev1
-
-		#Add sprout, replace:
- #test6: add sprout, replace seed
- #test7: raid1 seed, add sprout, replace seed, replace sprout
- #test8: 3 level nested seeds, add sprout, replace mid level seed
- #test9: raid1, degraded seed mount, add sprout, replace missing, replace non missing seed
- #test10: add sprout, replace sprout
- #test11: raid1 seed, add sprout, replace sprout, replace sprout again
- #test12: 3 level nested seeds, add sprout, replace sprout
- #test13: degraded raid1 seed, add sprout, replace sprout
-
-		#Mount sprout, replace:
- #test14: NOP
- #test15: mount sprout, replace sprout
- #test16: mount sprout, replace seed
- #test17: Raid1, mount sprout, replace sprout
- #test18: Raid1, mount sprout, replace seed
- #test19: Raid1 degraded, mount sprout, replace sprout
- #test20: Raid1 degraded, mount sprout, replace missing
- #test21: 3 level nested seeds, mount sprout, replace mid level seed
-
-		#seed sprout test:
- #test22: mount sprout, mount seed
- #test23: clean, mount -o device sprout
- #test24: raid1, mount sprout
- #test25: clean, scan, mount sprout
- #test26: raid1, clean, mount -o device sprout
- #test26: raid1, clean, scan, mount sprout
-
-		#dev add del test:
- #test27: dev add
- #test28: dev del
-
-		#dev scan test:
- #test29: scan mount
- #test30: use -o mount
-
-		#subvol mount test:
- #test31: mount, mount subvol
-
-		#remount test:
- #test32: mount, remount
-
-		#add sprout test:
- #test33: add sprout
- #test34: raid1 seed, add sprout
- #test35: add sprout, umount, mount seed, mount sprout
-
- #test36: simple, mkfs, mount
-
-
 # Devices are hard coded. sorry
 
 # Assign per your config, all 5 needed, replace might fail
 # if DEV5 < DEV4 < DEV3 < DEV2 < DEV1
-DEV1=
-DEV2=
-DEV3=
-DEV4=
-DEV5=
+#DEV1=/dev/sdc
+#DEV2=/dev/sdd
+#DEV3=/dev/sde
+#DEV4=/dev/sdf
+#DEV5=/dev/sdg
 
-[[ -z $DEV1 ]] || [[ -z $DEV2 ]] || [[ -z $DEV3 ]] || [[ -z $DEV4 ]] || [[ -z $DEV5 ]] && echo "Need to initialize DEVx as above here" && exit
-
-TEST_FSID=1c52f894-0ead-43d6-847a-d42359f78370
 
 #Enable or disable sysfs data collection by set/unset the below
 #TMP_FILE=''
 TMP_FILE=`mktemp`
 
 #If the btrfs is root fs as well then set this
-#CANT_CLEAN='yes'
+SKIP_CLEAN='yes'
+
+TEST_FSID=1c52f894-0ead-43d6-847a-d42359f78370
+
+[[ -z $DEV1 ]] || [[ -z $DEV2 ]] || [[ -z $DEV3 ]] || [[ -z $DEV4 ]] || [[ -z $DEV5 ]] && echo "Need to initialize DEVx as above here" && exit
 
 ent_cont()
 {
@@ -101,12 +41,12 @@ ent_cont()
 
 erase()
 {
-	for i in $DEV1 $DEV2 $DEV3 $DEV4 $DEV5; do wipefs -a $i > /dev/null; done
+	#for i in $DEV1 $DEV2 $DEV3 $DEV4 $DEV5; do wipefs -a $i > /dev/null; done
 }
 
 clean()
 {
-	[[ -z $CANT_CLEAN ]] && return
+	! [[ -z $SKIP_CLEAN ]] && return
 
 	! modprobe -r btrfs && echo "For btrfs boot set CANT_CLEAN to yes here above" && exit
 	modprobe btrfs
@@ -117,13 +57,20 @@ collect_sysfs()
 	# see above to disable sysfs data collection
 	[[ -z $TMP_FILE ]] && return
 
-	echo ---------------- $1 ------------- >> $TMP_FILE
-	find /sys/fs/btrfs -type f -exec cat {} \; -print >> $TMP_FILE
+	echo ---------------- $TEST ------------- >> $TMP_FILE
+	find /sys/fs/btrfs -type f -exec cat {} \; -print >> $TMP_FILE || exit
 }
 
 _mkfs.btrfs()
 {
-	mkfs.btrfs $* > /dev/null
+	LABEL=$TEST
+	mkfs.btrfs -L $LABEL -U $TEST_FSID $* > /dev/null
+	#mkfs.btrfs -L $LABEL $* > /dev/null
+}
+
+__log()
+{
+	echo -e "\n$TEST $1"
 }
 
 
@@ -131,8 +78,8 @@ test1()
 {
 	TEST="test1"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID -d raid1 -m raid1 $DEV1 $DEV2 -f
+	__log "$1"
+_mkfs.btrfs -d raid1 -m raid1 $DEV1 $DEV2 -f
 	collect_sysfs "$TEST"
 mount $DEV2 /btrfs
 	collect_sysfs "$TEST"
@@ -148,8 +95,8 @@ test2()
 {
 	TEST="test2"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID -d raid1 -m raid1 $DEV1 $DEV2 -f
+	__log "$1"
+_mkfs.btrfs -d raid1 -m raid1 $DEV1 $DEV2 -f
 	clean
 mount -o degraded $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -165,8 +112,8 @@ test4()
 {
 	TEST="test4"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID -d raid1 -m raid1 $DEV1 $DEV2 -f
+	__log "$1"
+_mkfs.btrfs -d raid1 -m raid1 $DEV1 $DEV2 -f
 	clean
 mount -o degraded $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -184,8 +131,8 @@ test5()
 {
 	TEST="test5"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID -d raid1 -m raid1 $DEV1 $DEV2 -f
+	__log "$1"
+_mkfs.btrfs -d raid1 -m raid1 $DEV1 $DEV2 -f
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
 btrfs rep start -B $DEV2 $DEV3 /btrfs -f
@@ -204,8 +151,8 @@ test6()
 {
 	TEST="test6"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID $DEV1 -f
+	__log "$1"
+_mkfs.btrfs $DEV1 -f
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -223,8 +170,8 @@ test7()
 {
 	TEST="test7"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID -draid1 -mraid1 $DEV1 $DEV2 -f
+	__log "$1"
+_mkfs.btrfs -draid1 -mraid1 $DEV1 $DEV2 -f
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -244,8 +191,8 @@ test8()
 {
 	TEST="test8"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID $DEV1 -f
+	__log "$1"
+_mkfs.btrfs $DEV1 -f
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -281,8 +228,8 @@ test9()
 {
 	TEST="test9"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID -d raid1 -m raid1 $DEV1 $DEV2 -f
+	__log "$1"
+_mkfs.btrfs -d raid1 -m raid1 $DEV1 $DEV2 -f
 	collect_sysfs "$TEST"
 btrfstune -S 1 $DEV1
 	clean
@@ -308,8 +255,8 @@ test10()
 {
 	TEST="test10"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID $DEV1 -f
+	__log "$1"
+_mkfs.btrfs $DEV1 -f
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -327,8 +274,8 @@ test11()
 {
 	TEST="test11"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID -draid1 -mraid1 $DEV1 $DEV2 -f
+	__log "$1"
+_mkfs.btrfs -draid1 -mraid1 $DEV1 $DEV2 -f
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -348,8 +295,8 @@ test12()
 {
 	TEST="test12"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID $DEV1 -f
+	__log "$1"
+_mkfs.btrfs $DEV1 -f
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -385,8 +332,8 @@ test13()
 {
 	TEST="test13"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID -d raid1 -m raid1 $DEV1 $DEV2 -f
+	__log "$1"
+_mkfs.btrfs -d raid1 -m raid1 $DEV1 $DEV2 -f
 	collect_sysfs "$TEST"
 btrfstune -S 1 $DEV1
 	clean
@@ -409,8 +356,8 @@ test15()
 {
 	TEST="test15"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID $DEV1 -f
+	__log "$1"
+_mkfs.btrfs  $DEV1 -f
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -431,8 +378,8 @@ test16()
 {
 	TEST="test16"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID $DEV1 -f
+	__log "$1"
+_mkfs.btrfs  $DEV1 -f
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -453,8 +400,8 @@ test17()
 {
 	TEST="test17"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID -draid1 -mraid1 $DEV1 $DEV2 -f
+	__log "$1"
+_mkfs.btrfs  -draid1 -mraid1 $DEV1 $DEV2 -f
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -476,8 +423,8 @@ test18()
 {
 	TEST="test18"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID -draid1 -mraid1 $DEV1 $DEV2 -f
+	__log "$1"
+_mkfs.btrfs  -draid1 -mraid1 $DEV1 $DEV2 -f
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -499,8 +446,8 @@ test19()
 {
 	TEST="test19"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID -draid1 -mraid1 $DEV1 $DEV2 -f
+	__log "$1"
+_mkfs.btrfs  -draid1 -mraid1 $DEV1 $DEV2 -f
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -523,8 +470,8 @@ test20()
 {
 	TEST="test20"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID -draid1 -mraid1 $DEV1 $DEV2 -f
+	__log "$1"
+_mkfs.btrfs  -draid1 -mraid1 $DEV1 $DEV2 -f
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -547,8 +494,8 @@ test21()
 {
 	TEST="test21"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID $DEV1 -f
+	__log "$1"
+_mkfs.btrfs  $DEV1 -f
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -586,8 +533,8 @@ test22()
 {
 	TEST="test22"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID $DEV1 -f
+	__log "$1"
+_mkfs.btrfs  $DEV1 -f
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -612,8 +559,8 @@ test23()
 {
 	TEST="test23"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID $DEV1 -f
+	__log "$1"
+_mkfs.btrfs  $DEV1 -f
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -634,9 +581,9 @@ umount /btrfs
 
 test24()
 {
-	TEST="test24" && erase && echo -e "\n$TEST"
+	TEST="test24" && erase && __log "$1"
 
-_mkfs.btrfs -L $TEST -U $TEST_FSID $DEV1 $DEV2 -f
+_mkfs.btrfs  $DEV1 $DEV2 -f
 
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
@@ -657,8 +604,8 @@ test25()
 {
 	TEST="test25"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID $DEV1 -f
+	__log "$1"
+_mkfs.btrfs  $DEV1 -f
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -682,8 +629,8 @@ test26()
 {
 	TEST="test26"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID $DEV1 $DEV2 -f
+	__log "$1"
+_mkfs.btrfs  $DEV1 $DEV2 -f
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -702,12 +649,37 @@ umount /btrfs
 	ent_cont
 }
 
+test37()
+{
+	TEST="test37"
+	erase
+	__log "$1"
+_mkfs.btrfs  -draid1 -mraid1 $DEV1 $DEV2 -f
+btrfstune -S 1 $DEV1
+mount $DEV1 /btrfs
+	collect_sysfs "$TEST"
+btrfs dev add $DEV3 /btrfs
+	collect_sysfs "$TEST"
+umount /btrfs
+	collect_sysfs "$TEST"
+
+	clean
+
+btrfs dev scan
+mount $DEV1 /btrfs
+	collect_sysfs "$TEST"
+umount /btrfs
+	collect_sysfs "$TEST"
+	clean
+	ent_cont
+}
+
 test27()
 {
 	TEST="test27"
 	erase
-	echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID $DEV1 $DEV2 -f
+	__log "$1"
+_mkfs.btrfs  $DEV1 $DEV2 -f
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
 btrfs dev add $DEV3 /btrfs
@@ -721,9 +693,9 @@ umount /btrfs
 
 test28()
 {
-	TEST="test28" && erase && echo -e "\n$TEST"
+	TEST="test28" && erase && __log "$1"
 
-_mkfs.btrfs -dsingle -msingle -L $TEST -U $TEST_FSID $DEV1 $DEV2 -f
+_mkfs.btrfs -dsingle -msingle  $DEV1 $DEV2 -f
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
 btrfs dev del $DEV1 /btrfs
@@ -736,10 +708,10 @@ umount /btrfs
 
 test29()
 {
-	TEST="test29" && erase && echo -e "\n$TEST"
+	TEST="test29" && erase && __log "$1"
 clean
 	collect_sysfs "$TEST"
-_mkfs.btrfs -dsingle -msingle -L $TEST -U $TEST_FSID $DEV1 $DEV2 -f
+_mkfs.btrfs -dsingle -msingle  $DEV1 $DEV2 -f
 	collect_sysfs "$TEST"
 clean
 	collect_sysfs "$TEST"
@@ -758,10 +730,10 @@ clean
 
 test30()
 {
-	TEST="test30" && erase && echo -e "\n$TEST"
+	TEST="test30" && erase && __log "$1"
 clean
 	collect_sysfs "$TEST"
-_mkfs.btrfs -dsingle -msingle -L $TEST -U $TEST_FSID $DEV1 $DEV2 $DEV3 -f
+_mkfs.btrfs -dsingle -msingle  $DEV1 $DEV2 $DEV3 -f
 	collect_sysfs "$TEST"
 clean
 	collect_sysfs "$TEST"
@@ -777,8 +749,8 @@ clean
 
 test31()
 {
-	TEST="test31" && erase && echo -e "\n$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID $DEV1 -f
+	TEST="test31" && erase && __log "$1"
+_mkfs.btrfs  $DEV1 -f
 	collect_sysfs "$TEST"
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -797,9 +769,9 @@ clean
 
 test32()
 {
-	TEST="test32" && erase && echo -e "\n$TEST"
+	TEST="test32" && erase && __log "$1"
 
-_mkfs.btrfs -L $TEST -U $TEST_FSID $DEV1 -f
+_mkfs.btrfs  $DEV1 -f
 	collect_sysfs "$TEST"
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -815,10 +787,10 @@ clean
 
 test33()
 {
-	TEST="test33" && erase && echo -e "\n$TEST"
+	TEST="test33" && erase && __log "$1"
 
 	collect_sysfs "$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID $DEV1 -f
+_mkfs.btrfs  $DEV1 -f
 	collect_sysfs "$TEST"
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
@@ -835,10 +807,10 @@ clean
 
 test34()
 {
-	TEST="test34" && erase && echo -e "\n$TEST"
+	TEST="test34" && erase && __log "$1"
 clean
 	collect_sysfs "$TEST"
-_mkfs.btrfs -draid1 -mraid1 -L $TEST -U $TEST_FSID $DEV1 $DEV2 -f
+_mkfs.btrfs -draid1 -mraid1  $DEV1 $DEV2 -f
 	collect_sysfs "$TEST"
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
@@ -855,10 +827,10 @@ clean
 
 test35()
 {
-	TEST="test35" && erase && echo -e "\n$TEST"
+	TEST="test35" && erase && __log "$1"
 clean
 	collect_sysfs "$TEST"
-_mkfs.btrfs -L $TEST -U $TEST_FSID $DEV1 -f
+_mkfs.btrfs  $DEV1 -f
 	collect_sysfs "$TEST"
 btrfstune -S 1 $DEV1
 mount $DEV1 /btrfs
@@ -882,10 +854,9 @@ clean
 
 test36()
 {
-	TEST="test36" && erase && echo -e "\n$TEST"
+	TEST="test36" && erase && __log "$1"
 
-_mkfs.btrfs -L $TEST -U $TEST_FSID $DEV1 $DEV2
-
+_mkfs.btrfs  $DEV1 $DEV2
 	collect_sysfs "$TEST"
 mount $DEV1 /btrfs
 	collect_sysfs "$TEST"
@@ -900,56 +871,85 @@ clean
 
 test0()
 {
-  echo "Have you tested with btrfs boot, you can't do that here\n"
+  echo "Have you tested with btrfs boot ?"
 }
 
-clean
 
+run_seed_sprout_replace_unsupported()
+{
 # Due to a bug in the ref below, don't enable 6-21 yet.
 #   ref: email: Sub: "replace seed/sprout hangs (regression ?)"
-#sleep 2; test6
-#sleep 2; test7
-#sleep 2; test8
-#sleep 2; test9
-#sleep 2; test9
-#sleep 2; test10
-#sleep 2; test11
-#sleep 2; test12
-#sleep 2; test13
+		#Add sprout, replace:
+test6 "#: add sprout, replace seed"
+test7  "#: raid1 seed, add sprout, replace seed, replace sprout"
+test8  "#: 3 level nested seeds, add sprout, replace mid level seed"
+test9  "#: raid1, degraded seed mount, add sprout, replace missing, replace non missing seed"
+test10  "#: add sprout, replace sprout"
+test11  "#: raid1 seed, add sprout, replace sprout, replace sprout again"
+test12  "#: 3 level nested seeds, add sprout, replace sprout"
+test13  "#: degraded raid1 seed, add sprout, replace sprout"
 
-#sleep 2; test14
-#sleep 2; test15
-#sleep 2; test16
-#sleep 2; test17
-#sleep 2; test18
-#sleep 2; test19
-#sleep 2; test20
-#sleep 2; test21
+		#Mount sprout, replace:
+test14  "#: NOP"
+test15  "#: mount sprout, replace sprout"
+test16  "#: mount sprout, replace seed"
+test17  "#: Raid1, mount sprout, replace sprout"
+test18  "#: Raid1, mount sprout, replace seed"
+test19  "#: Raid1 degraded, mount sprout, replace sprout"
+test20  "#: Raid1 degraded, mount sprout, replace missing"
+test21  "#: 3 level nested seeds, mount sprout, replace mid level seed"
+}
 
-sleep 2; test36
+run_scan_mount_test()
+{
+		#dev scan test, mount test
+test36  "#: simple, mkfs, mount"
+test29  "#: scan mount"
+test30  "#: use -o mount to scan"
+		#subvol mount test:
+test31  "#: mount, mount subvol"
+		#remount test:
+test32  "#: mount, remount"
 
-#sleep 2; test29
-#sleep 2; test30
-#sleep 2; test31
-#sleep 2; test32
-#sleep 2; test33
-#sleep 2; test34
-#sleep 2; test35
+		#dev add del test:
+#test27  "#: dev add"
+#test28  "#: dev del"
+}
 
-#sleep 2; test22
-#sleep 2; test23
-#sleep 2; test24
-#sleep 2; test25
-#sleep 2; test26
+run_replace_tests()
+{
+		#Replace:
+test1  "#: raid1, replace normal"
+test2  "#: raid1, replace missing"
+test3  "#: NOP"
+test4  "#: raid1, replace missing, replace normal"
+test5  "#: raid1, replace dev2, replace dev1"
+}
 
-#sleep 2; test27
-#sleep 2; test28
+run_seed_sprout_tests()
+{
+		#seed sprout test:
+test22  "#: mount sprout, mount seed"
+test23  "#: clean, mount -o device sprout"
+test24  "#: raid1, mount sprout"
+test25  "#: clean, scan, mount sprout"
+test26  "#: raid1, clean, mount -o device sprout"
+test37  "#: raid1, clean, scan, mount sprout"
+		#add sprout test:
+test33  "#: add sprout"
+test34  "#: raid1 seed, add sprout"
+test35  "#: add sprout, umount, mount seed, mount sprout"
+}
 
-#sleep 2; test1
-#sleep 2; test2
-#sleep 2; test3
-#sleep 2; test4
-#sleep 2; test5
+#### Actual testing begins here #####
+clean
+		#When you change something related to device
+		#remember to test on btrfs boot separately
+#test0  "#: btrfs boot test
 
+run_scan_mount_test
+run_replace_tests
+run_seed_sprout_tests
+#run_seed_sprout_replace_unsupported
 
 [[ -z $TMP_FILE ]] || echo -e "\nTMP_FILE= $TMP_FILE"
