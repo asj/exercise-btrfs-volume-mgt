@@ -16,9 +16,9 @@
 # if DEV5 < DEV4 < DEV3 < DEV2 < DEV1
 #DEV1=/dev/sdc
 #DEV2=/dev/sdd
-#DEV3=/dev/sde
-#DEV4=/dev/sdf
-#DEV5=/dev/sdg
+#DEV3=/dev/sdf
+#DEV4=/dev/sdg
+#DEV5=/dev/sde
 
 
 #Enable or disable sysfs data collection by set/unset the below
@@ -36,12 +36,12 @@ ent_cont()
 {
 	echo -n "Done. Enter to continue: "
 	#read
-	echo "wait for input is disabled, uncomment above to wait."
+	#"wait for input is disabled, uncomment above to wait."
 }
 
 erase()
 {
-	#for i in $DEV1 $DEV2 $DEV3 $DEV4 $DEV5; do wipefs -a $i > /dev/null; done
+	for i in $DEV1 $DEV2 $DEV3 $DEV4 $DEV5; do wipefs -a $i > /dev/null; done
 }
 
 clean()
@@ -58,14 +58,14 @@ collect_sysfs()
 	[[ -z $TMP_FILE ]] && return
 
 	echo ---------------- $TEST ------------- >> $TMP_FILE
-	find /sys/fs/btrfs -type f -exec cat {} \; -print >> $TMP_FILE || exit
+	find /sys/fs/btrfs -type f -exec cat {} \; -print >> $TMP_FILE
 }
 
 _mkfs.btrfs()
 {
 	LABEL=$TEST
-	mkfs.btrfs -L $LABEL -U $TEST_FSID $* > /dev/null
-	#mkfs.btrfs -L $LABEL $* > /dev/null
+	#mkfs.btrfs -L $LABEL -U $TEST_FSID $* > /dev/null
+	mkfs.btrfs -L $LABEL $* > /dev/null
 }
 
 __log()
@@ -513,7 +513,7 @@ umount /btrfs
 btrfstune -S 1 $DEV3
 mount $DEV3 /btrfs
 	collect_sysfs "$TEST"
-btrfs dev add $DEV4 /btrfs2 -f
+btrfs dev add $DEV4 /btrfs -f
 	collect_sysfs "$TEST"
 umount /btrfs
 mount $DEV4 /btrfs
@@ -946,9 +946,17 @@ test35  "#: add sprout, umount, mount seed, mount sprout"
 
 #### Actual testing begins here #####
 clean
-run_scan_mount_test
-run_replace_tests
-run_seed_sprout_tests
-#run_seed_sprout_replace_unsupported
+
+if [ $# -eq 0 ]; then
+	run_scan_mount_test
+	run_replace_tests
+	run_seed_sprout_tests
+	run_seed_sprout_replace_unsupported
+else
+	for i in $*
+	do
+		test$i
+	done
+fi
 
 [[ -z $TMP_FILE ]] || echo -e "\nTMP_FILE= $TMP_FILE"
